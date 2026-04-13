@@ -27,9 +27,9 @@ else
     exit 1
 fi
 
-# 2. Проверка BOT_TOKEN
-if [ -z "$BOT_TOKEN" ]; then
-    echo -e "${RED}Ошибка: BOT_TOKEN не задан в .env${NC}"
+# 2. Проверка TELEGRAM_BOT_TOKEN
+if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
+    echo -e "${RED}Ошибка: TELEGRAM_BOT_TOKEN не задан в .env${NC}"
     exit 1
 fi
 
@@ -55,7 +55,7 @@ echo -e "${GREEN}Сетевой интерфейс: $NETWORK_INTERFACE${NC}"
 # 5. Установка системных пакетов
 echo -e "${YELLOW}Обновление пакетов и установка зависимостей...${NC}"
 apt update && apt upgrade -y
-apt install -y wireguard qrencode python3 python3-pip python3-venv git ufw iptables curl
+apt install -y wireguard qrencode python3 python3-pip python3-venv git ufw iptables curl jq at
 
 # 6. Копирование файлов бота и API
 echo -e "${YELLOW}Копирование файлов бота в $INSTALL_DIR...${NC}"
@@ -86,6 +86,7 @@ cp "$SCRIPT_DIR/wireguard/wg0.conf.template" /etc/wireguard/wg0.conf
 sed -i "s|{{ WG_PORT }}|${WG_PORT:-51820}|g" /etc/wireguard/wg0.conf
 sed -i "s|{{ SERVER_PRIVATE_KEY }}|${SERVER_PRIVATE_KEY}|g" /etc/wireguard/wg0.conf
 sed -i "s|{{ NETWORK_INTERFACE }}|${NETWORK_INTERFACE}|g" /etc/wireguard/wg0.conf
+sed -i "s|{{ VPN_SUBNET }}|${VPN_SUBNET:-10.8.0.}|g" /etc/wireguard/wg0.conf
 chmod 600 /etc/wireguard/wg0.conf
 chmod 600 /etc/wireguard/server_private.key
 
@@ -111,14 +112,16 @@ echo -e "${YELLOW}Запуск WireGuard...${NC}"
 systemctl enable wg-quick@wg0
 systemctl start wg-quick@wg0
 
-# 13. Установка wg-manager.sh (если есть в репозитории)
+# 13. Установка wg-manager.sh
 echo -e "${YELLOW}Подготовка скриптов WireGuard...${NC}"
 mkdir -p /etc/wireguard/scripts
 if [ -f "$SCRIPT_DIR/wireguard/scripts/wg-manager.sh" ]; then
     cp "$SCRIPT_DIR/wireguard/scripts/wg-manager.sh" /etc/wireguard/scripts/
     chmod +x /etc/wireguard/scripts/wg-manager.sh
+    echo -e "${GREEN}wg-manager.sh установлен${NC}"
 else
-    echo -e "${YELLOW}⚠️  wg-manager.sh не найден в репозитории. Бот не сможет управлять клиентами!${NC}"
+    echo -e "${RED}Ошибка: wg-manager.sh не найден в репозитории!${NC}"
+    exit 1
 fi
 
 # 14. Генерация API-токена
@@ -133,8 +136,8 @@ if [ ! -f "$API_TOKEN_FILE" ]; then
 else
     echo -e "${YELLOW}API-токен уже существует, оставляем без изменений${NC}"
 fi
-# API_TOKEN передаётся в .env на случай, если бот захочет читать оттуда
-echo "API_TOKEN=$(cat $API_TOKEN_FILE)" >> "$INSTALL_DIR/.env"
+API_TOKEN_VALUE=$(cat $API_TOKEN_FILE)
+sed -i "s|^API_TOKEN=.*|API_TOKEN=$API_TOKEN_VALUE|" "$INSTALL_DIR/.env"
 
 # 15. Создание systemd сервиса для API
 echo -e "${YELLOW}Создание systemd сервиса для API...${NC}"
