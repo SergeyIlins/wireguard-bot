@@ -2,21 +2,36 @@
 import logging
 import httpx
 import json
+import os
+import re
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
-# --- Конфигурация ---
-TELEGRAM_BOT_TOKEN = "8600570752:AAH17G84B_fpwSI6AhetUeYQiDAipRMqTvQ"
-API_URL = "http://127.0.0.1:8000"
+# --- Конфигурация из переменных окружения ---
+TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN")
+if not TELEGRAM_BOT_TOKEN:
+    raise ValueError("BOT_TOKEN не задан в .env")
 
-# Разрешённые пользователи (укажите ваш Telegram ID)
-ALLOWED_USERS = {466305214}  # Замените на свой ID
+API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
 
-# Читаем API токен
-with open("/opt/wireguard-api/.api_token", "r") as f:
-    API_TOKEN = f.read().strip()
-# -------------------
+# ID администраторов (через запятую в .env)
+ALLOWED_USERS_STR = os.getenv("ADMIN_IDS", "")
+ALLOWED_USERS = set()
+if ALLOWED_USERS_STR:
+    try:
+        ALLOWED_USERS = {int(uid.strip()) for uid in ALLOWED_USERS_STR.split(",") if uid.strip()}
+    except ValueError:
+        raise ValueError("ADMIN_IDS должен содержать числа через запятую")
+
+# API токен из файла (генерируется установщиком)
+API_TOKEN_FILE = "/opt/wireguard-api/.api_token"
+if os.path.exists(API_TOKEN_FILE):
+    with open(API_TOKEN_FILE, "r") as f:
+        API_TOKEN = f.read().strip()
+else:
+    raise FileNotFoundError(f"Файл {API_TOKEN_FILE} не найден. Запустите install.sh")
+# -------------------------------------------
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -152,7 +167,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if context.user_data.get('awaiting_name'):
         name = text
-        import re
         if not re.match(r'^[a-zA-Z0-9_-]{3,20}$', name):
             await update.message.reply_text("Некорректное имя. Разрешены буквы, цифры, - и _. Длина 3-20. Попробуйте снова /menu")
             context.user_data['awaiting_name'] = False
