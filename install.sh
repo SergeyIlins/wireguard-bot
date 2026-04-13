@@ -85,7 +85,7 @@ SERVER_PUBLIC_KEY=$(cat server_public.key)
 
 # 9. Создание конфигурации WireGuard из шаблона
 echo -e "${YELLOW}Создание конфигурации WireGuard...${NC}"
-cp "$SCRIPT_DIR/wireguard/wg0.conf.template" /etc/wireguard/wg0.conf
+cp "$SCRIPT_DIR/wireguard/wg0.conf" /etc/wireguard/wg0.conf
 # Замена плейсхолдеров
 sed -i "s|{{ WG_PORT }}|${WG_PORT:-51820}|g" /etc/wireguard/wg0.conf
 sed -i "s|{{ SERVER_PRIVATE_KEY }}|${SERVER_PRIVATE_KEY}|g" /etc/wireguard/wg0.conf
