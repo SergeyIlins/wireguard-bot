@@ -1,6 +1,7 @@
 [Unit]
 Description=WireGuard Telegram Bot
-After=network.target
+After=network.target wg-api.service
+Requires=wg-api.service
 
 [Service]
 Type=simple
