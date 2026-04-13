@@ -13,7 +13,7 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-echo -e "${GREEN}=== Установка WireGuard + Telegram Bot ===${NC}"
+echo -e "${GREEN}=== Установка WireGuard + Telegram Bot + API ===${NC}"
 
 # Определение директории скрипта (корень репозитория)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -31,8 +31,8 @@ else
 fi
 
 # 2. Проверка обязательных переменных
-if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
-    echo -e "${RED}Ошибка: TELEGRAM_BOT_TOKEN не задан в .env${NC}"
+if [ -z "$BOT_TOKEN" ]; then
+    echo -e "${RED}Ошибка: BOT_TOKEN не задан в .env${NC}"
     exit 1
 fi
 
@@ -58,30 +58,13 @@ echo -e "${GREEN}Сетевой интерфейс: $NETWORK_INTERFACE${NC}"
 # 5. Обновление системы и установка пакетов
 echo -e "${YELLOW}Обновление пакетов и установка зависимостей...${NC}"
 apt update && apt upgrade -y
-apt install -y wireguard qrencode python3 python3-pip python3-venv git ufw iptables
+apt install -y wireguard qrencode python3 python3-pip python3-venv git ufw iptables curl
 
 # 6. Копирование файлов бота в INSTALL_DIR
 echo -e "${YELLOW}Копирование файлов бота в $INSTALL_DIR...${NC}"
 mkdir -p "$INSTALL_DIR"
 cp -r "$SCRIPT_DIR/bot/"* "$INSTALL_DIR/"
 cp "$SCRIPT_DIR/.env" "$INSTALL_DIR/.env"
-
-# 6.5 Создание API-токена для бота (если требуется)
-echo -e "${YELLOW}Создание API-токена...${NC}"
-API_TOKEN_DIR="/opt/wireguard-api"
-API_TOKEN_FILE="$API_TOKEN_DIR/.api_token"
-mkdir -p "$API_TOKEN_DIR"
-if [ ! -f "$API_TOKEN_FILE" ]; then
-    # Генерируем случайный токен, если его нет
-    openssl rand -hex 32 > "$API_TOKEN_FILE"
-    chmod 600 "$API_TOKEN_FILE"
-    echo -e "${GREEN}Сгенерирован новый API-токен и сохранён в $API_TOKEN_FILE${NC}"
-else
-    echo -e "${YELLOW}API-токен уже существует, оставляем без изменений${NC}"
-fi
-# Опционально: можно также передать этот токен в .env, если бот его читает оттуда
-echo "API_TOKEN=$(cat $API_TOKEN_FILE)" >> "$INSTALL_DIR/.env"
-
 
 # 7. Установка Python-зависимостей
 echo -e "${YELLOW}Установка Python-зависимостей...${NC}"
@@ -102,7 +85,7 @@ SERVER_PUBLIC_KEY=$(cat server_public.key)
 
 # 9. Создание конфигурации WireGuard из шаблона
 echo -e "${YELLOW}Создание конфигурации WireGuard...${NC}"
-cp "$SCRIPT_DIR/wireguard/wg0.conf" /etc/wireguard/wg0.conf
+cp "$SCRIPT_DIR/wireguard/wg0.conf.template" /etc/wireguard/wg0.conf
 # Замена плейсхолдеров
 sed -i "s|{{ WG_PORT }}|${WG_PORT:-51820}|g" /etc/wireguard/wg0.conf
 sed -i "s|{{ SERVER_PRIVATE_KEY }}|${SERVER_PRIVATE_KEY}|g" /etc/wireguard/wg0.conf
@@ -119,7 +102,6 @@ if [ ! -f /etc/sysctl.conf ]; then
 fi
 sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' /etc/sysctl.conf
 sed -i 's/#net.ipv6.conf.all.forwarding=1/net.ipv6.conf.all.forwarding=1/' /etc/sysctl.conf
-# Если строк не было вообще — добавим
 grep -q "net.ipv4.ip_forward" /etc/sysctl.conf || echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
 grep -q "net.ipv6.conf.all.forwarding" /etc/sysctl.conf || echo "net.ipv6.conf.all.forwarding=1" >> /etc/sysctl.conf
 sysctl -p
@@ -135,22 +117,57 @@ echo -e "${YELLOW}Запуск WireGuard...${NC}"
 systemctl enable wg-quick@wg0
 systemctl start wg-quick@wg0
 
-# 13. Создание systemd сервиса для бота
+# 13. Создание директории для скриптов WireGuard (wg-manager.sh должен быть)
+echo -e "${YELLOW}Подготовка скриптов WireGuard...${NC}"
+mkdir -p /etc/wireguard/scripts
+# Если wg-manager.sh не предоставлен, создаём заглушку (замените на реальный скрипт из вашего проекта)
+if [ ! -f /etc/wireguard/scripts/wg-manager.sh ]; then
+    echo -e "${YELLOW}wg-manager.sh не найден. Пожалуйста, поместите его в /etc/wireguard/scripts/${NC}"
+    # Здесь можно добавить установку wg-manager.sh из репозитория
+fi
+
+# 14. Генерация API-токена для взаимодействия бота с API
+echo -e "${YELLOW}Создание API-токена...${NC}"
+API_TOKEN_DIR="/opt/wireguard-api"
+API_TOKEN_FILE="$API_TOKEN_DIR/.api_token"
+mkdir -p "$API_TOKEN_DIR"
+if [ ! -f "$API_TOKEN_FILE" ]; then
+    openssl rand -hex 32 > "$API_TOKEN_FILE"
+    chmod 600 "$API_TOKEN_FILE"
+    echo -e "${GREEN}Сгенерирован новый API-токен и сохранён в $API_TOKEN_FILE${NC}"
+else
+    echo -e "${YELLOW}API-токен уже существует, оставляем без изменений${NC}"
+fi
+# Добавляем токен в .env, чтобы бот мог его прочитать (если он использует переменные окружения)
+echo "API_TOKEN=$(cat $API_TOKEN_FILE)" >> "$INSTALL_DIR/.env"
+
+# 15. Создание systemd сервиса для API
+echo -e "${YELLOW}Создание systemd сервиса для API...${NC}"
+cp "$SCRIPT_DIR/systemd/wg-api.service" /etc/systemd/system/wg-api.service
+sed -i "s|/opt/wg-bot|$INSTALL_DIR|g" /etc/systemd/system/wg-api.service
+
+# 16. Создание systemd сервиса для бота
 echo -e "${YELLOW}Создание systemd сервиса для бота...${NC}"
 cp "$SCRIPT_DIR/systemd/wg-bot.service" /etc/systemd/system/wg-bot.service
-# Замена пути в сервисе, если он отличается от /opt/wg-bot
 sed -i "s|/opt/wg-bot|$INSTALL_DIR|g" /etc/systemd/system/wg-bot.service
 
 systemctl daemon-reload
+
+# 17. Запуск API и бота
+echo -e "${YELLOW}Запуск API и бота...${NC}"
+systemctl enable wg-api
+systemctl start wg-api
 systemctl enable wg-bot
 systemctl start wg-bot
 
-# 14. Вывод итоговой информации
+# 18. Вывод итоговой информации
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}Установка успешно завершена!${NC}"
 echo -e "${GREEN}WireGuard работает на порту: ${WG_PORT:-51820}${NC}"
 echo -e "${GREEN}Публичный ключ сервера: ${SERVER_PUBLIC_KEY}${NC}"
 echo -e "${GREEN}Публичный IP сервера: ${SERVER_PUBLIC_IP}${NC}"
+echo -e "${GREEN}Статус API: $(systemctl is-active wg-api)${NC}"
 echo -e "${GREEN}Статус бота: $(systemctl is-active wg-bot)${NC}"
+echo -e "${GREEN}Логи API: journalctl -u wg-api -f${NC}"
 echo -e "${GREEN}Логи бота: journalctl -u wg-bot -f${NC}"
 echo -e "${GREEN}========================================${NC}"
