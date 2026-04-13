@@ -4,26 +4,23 @@
 
 set -e
 
-# --- Конфигурация ---
-WG_CONFIG="/etc/wireguard/wg0.conf"
-SERVER_PUBLIC_KEY_FILE="/etc/wireguard/server_public.key"
-SERVER_PRIVATE_KEY_FILE="/etc/wireguard/server_private.key"
-META_FILE="/etc/wireguard/clients_meta.json"
-CLIENTS_DIR="/root/wireguard-clients"   # сюда будут сохраняться конфиги и QR-коды
+# --- Конфигурация (можно переопределить через переменные окружения) ---
+WG_CONFIG="${WG_CONFIG:-/etc/wireguard/wg0.conf}"
+SERVER_PUBLIC_KEY_FILE="${SERVER_PUBLIC_KEY_FILE:-/etc/wireguard/server_public.key}"
+SERVER_PRIVATE_KEY_FILE="${SERVER_PRIVATE_KEY_FILE:-/etc/wireguard/server_private.key}"
+META_FILE="${META_FILE:-/etc/wireguard/clients_meta.json}"
+CLIENTS_DIR="${CLIENTS_DIR:-/root/wireguard-clients}"   # сюда будут сохраняться конфиги и QR-коды
 QRENCODE_BIN=$(which qrencode)
 
 # Параметры по умолчанию
-DEFAULT_WG_PORT=51820
-DEFAULT_VPN_SUBNET_PREFIX="10.8.0."
+DEFAULT_WG_PORT="${WG_PORT:-51820}"
+DEFAULT_VPN_SUBNET_PREFIX="${VPN_SUBNET:-10.8.0.}"
 DEFAULT_SERVER_IP="${DEFAULT_VPN_SUBNET_PREFIX}1"
 
-# Попытаемся вычислить публичный IP или использовать заданный в .env
+# Публичный IP сервера (если не задан, попытаемся определить)
 if [ -z "$SERVER_PUBLIC_IP" ] || [ "$SERVER_PUBLIC_IP" = "auto" ]; then
     SERVER_PUBLIC_IP=$(curl -s ifconfig.me || curl -s ipinfo.io/ip || echo "127.0.0.1")
 fi
-
-# Определение порта из конфига или переменной окружения
-WG_PORT=${WG_PORT:-51820}
 
 # Создаём директорию для клиентских конфигов
 mkdir -p "$CLIENTS_DIR"
@@ -106,7 +103,7 @@ DNS = 1.1.1.1, 8.8.8.8
 
 [Peer]
 PublicKey = $server_pubkey
-Endpoint = $SERVER_PUBLIC_IP:$WG_PORT
+Endpoint = $SERVER_PUBLIC_IP:$DEFAULT_WG_PORT
 AllowedIPs = 0.0.0.0/0, ::/0
 PersistentKeepalive = 25
 EOF
@@ -137,7 +134,7 @@ EOF
     local expires=0
     if [ "$duration_seconds" -gt 0 ]; then
         expires=$(($(date +%s) + duration_seconds))
-        # Планируем удаление
+        # Планируем удаление через at
         echo "systemctl restart wg-quick@wg0" | at now + "$duration_seconds" seconds 2>/dev/null || true
     fi
     meta=$(echo "$meta" | jq --arg name "$name" --arg ip "$client_ip" --argjson expires "$expires" \
