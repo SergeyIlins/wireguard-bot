@@ -31,8 +31,8 @@ else
 fi
 
 # 2. Проверка обязательных переменных
-if [ -z "$BOT_TOKEN" ]; then
-    echo -e "${RED}Ошибка: BOT_TOKEN не задан в .env${NC}"
+if [ -z "TELEGRAM_BOT_TOKEN" ]; then
+    echo -e "${RED}Ошибка: TELEGRAM_BOT_TOKEN не задан в .env${NC}"
     exit 1
 fi
 
