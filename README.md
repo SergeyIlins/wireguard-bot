@@ -1,5 +1,6 @@
 # 1. Клонируем репозиторий
 git clone git clone https://github.com/SergeyIlins/wireguard-bot.git
+
 cd wireguard-bot
 
 # 2. Копируем шаблон .env и редактируем его
