@@ -1,0 +1,15 @@
+[Unit]
+Description=WireGuard Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/wg-bot
+EnvironmentFile=/opt/wg-bot/.env
+ExecStart=/usr/bin/python3 /opt/wg-bot/bot.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
