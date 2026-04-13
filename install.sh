@@ -97,8 +97,15 @@ chmod 600 /etc/wireguard/server_private.key
 
 # 10. Включение IP-форвардинга
 echo -e "${YELLOW}Включение IP-форвардинга...${NC}"
-sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' /etc/sysctl.conf
-sed -i 's/#net.ipv6.conf.all.forwarding=1/net.ipv6.conf.all.forwarding=1/' /etc/sysctl.conf
+if [ ! -f /etc/sysctl.conf ]; then
+    touch /etc/sysctl.conf
+fi
+if ! grep -q "net.ipv4.ip_forward=1" /etc/sysctl.conf; then
+    echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+fi
+if ! grep -q "net.ipv6.conf.all.forwarding=1" /etc/sysctl.conf; then
+    echo "net.ipv6.conf.all.forwarding=1" >> /etc/sysctl.conf
+fi
 sysctl -p
 
 # 11. Настройка UFW
