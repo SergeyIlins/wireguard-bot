@@ -93,6 +93,13 @@ add_client() {
     # Читаем публичный ключ сервера
     local server_pubkey=$(cat "$SERVER_PUBLIC_KEY_FILE")
 
+        # Определяем Endpoint с учётом типа IP (IPv6 требует скобок)
+    if [[ "$SERVER_PUBLIC_IP" =~ .*:.* ]]; then
+        ENDPOINT="[$SERVER_PUBLIC_IP]:$DEFAULT_WG_PORT"
+    else
+        ENDPOINT="$SERVER_PUBLIC_IP:$DEFAULT_WG_PORT"
+    fi
+
     # Создаём клиентский конфиг
     local conf_path="$CLIENTS_DIR/${name}.conf"
     cat > "$conf_path" <<EOF
@@ -103,7 +110,7 @@ DNS = 1.1.1.1, 8.8.8.8
 
 [Peer]
 PublicKey = $server_pubkey
-Endpoint = $SERVER_PUBLIC_IP:$DEFAULT_WG_PORT
+Endpoint = $ENDPOINT
 AllowedIPs = 0.0.0.0/0, ::/0
 PersistentKeepalive = 25
 EOF
