@@ -1,7 +1,6 @@
 #!/bin/bash
 # WireGuard Manager Script
 # Поддерживает добавление/удаление клиентов, временные конфигурации, QR-коды и метаданные.
-# Исправлено: подсеть клиентов 10.0.0.0/24, принудительный IPv4 для Endpoint, MTU=1400.
 
 set -e
 
@@ -90,7 +89,7 @@ add_client() {
         exit 1
     fi
 
-    # Генерация ключей и IP
+   # Генерация ключей и IP
     local keys=$(generate_keys)
     local privkey=$(echo "$keys" | cut -d' ' -f1)
     local pubkey=$(echo "$keys" | cut -d' ' -f2)
@@ -123,6 +122,7 @@ AllowedIPs = 0.0.0.0/0
 PersistentKeepalive = 25
 EOF
 
+
     # Генерируем QR-код в PNG
     local png_path="$CLIENTS_DIR/${name}.png"
     if [ -n "$QRENCODE_BIN" ]; then
@@ -141,7 +141,7 @@ AllowedIPs = $client_ip/32
 # END_PEER $name
 EOF
 
-    # Применяем изменения в работающем интерфейсе
+    # Применяем изменения
     wg addconf wg0 <(echo "[Peer]" && echo "PublicKey = $pubkey" && echo "AllowedIPs = $client_ip/32") 2>/dev/null || wg syncconf wg0 <(wg-quick strip wg0)
 
     # Обновляем метаданные
@@ -231,3 +231,18 @@ case "$1" in
         exit 1
         ;;
 esac
+
+
+и код  файла wireguard/wg0.conf.template
+
+
+[Interface]
+Address = 10.0.0.1/24
+ListenPort = {{ WG_PORT }}
+PrivateKey = {{ SERVER_PRIVATE_KEY }}
+MTU = 1400
+
+PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o {{ NETWORK_INTERFACE }} -j MASQUERADE
+PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -s 10.0.0.0/24 -o {{ NETWORK_INTERFACE }} -j MASQUERADE
+
+# Клиенты будут добавляться скриптом wg-manager.sh
