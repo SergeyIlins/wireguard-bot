@@ -66,6 +66,23 @@ mkdir -p "$INSTALL_DIR"
 cp -r "$SCRIPT_DIR/bot/"* "$INSTALL_DIR/"
 cp "$SCRIPT_DIR/.env" "$INSTALL_DIR/.env"
 
+# 6.5 Создание API-токена для бота (если требуется)
+echo -e "${YELLOW}Создание API-токена...${NC}"
+API_TOKEN_DIR="/opt/wireguard-api"
+API_TOKEN_FILE="$API_TOKEN_DIR/.api_token"
+mkdir -p "$API_TOKEN_DIR"
+if [ ! -f "$API_TOKEN_FILE" ]; then
+    # Генерируем случайный токен, если его нет
+    openssl rand -hex 32 > "$API_TOKEN_FILE"
+    chmod 600 "$API_TOKEN_FILE"
+    echo -e "${GREEN}Сгенерирован новый API-токен и сохранён в $API_TOKEN_FILE${NC}"
+else
+    echo -e "${YELLOW}API-токен уже существует, оставляем без изменений${NC}"
+fi
+# Опционально: можно также передать этот токен в .env, если бот его читает оттуда
+echo "API_TOKEN=$(cat $API_TOKEN_FILE)" >> "$INSTALL_DIR/.env"
+
+
 # 7. Установка Python-зависимостей
 echo -e "${YELLOW}Установка Python-зависимостей...${NC}"
 cd "$INSTALL_DIR"
