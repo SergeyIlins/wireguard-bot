@@ -9,9 +9,9 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotComm
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
 # --- Конфигурация из переменных окружения ---
-TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 if not TELEGRAM_BOT_TOKEN:
-    raise ValueError("BOT_TOKEN не задан в .env")
+    raise ValueError("TELEGRAM_BOT_TOKEN не задан в .env")
 
 API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
 
