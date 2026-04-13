@@ -3,8 +3,7 @@ Address = 10.0.0.1/24
 ListenPort = {{ WG_PORT }}
 PrivateKey = {{ SERVER_PRIVATE_KEY }}
 
-# Опционально: PostUp/PostDown для NAT и файрвола
 PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o {{ NETWORK_INTERFACE }} -j MASQUERADE
 PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o {{ NETWORK_INTERFACE }} -j MASQUERADE
 
-# Здесь могут быть пиры, но для чистого развёртывания оставьте пустым или закомментируйте
+# Клиенты будут добавляться скриптом wg-manager.sh
