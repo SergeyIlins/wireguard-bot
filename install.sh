@@ -33,10 +33,16 @@ if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
     exit 1
 fi
 
-# 3. Публичный IP
+# 3. Публичный IP (с учётом PREFER_IP_VERSION)
 if [ -z "$SERVER_PUBLIC_IP" ] || [ "$SERVER_PUBLIC_IP" = "auto" ]; then
     echo -e "${YELLOW}Определяю публичный IP-адрес...${NC}"
-    SERVER_PUBLIC_IP=$(curl -s ifconfig.me || curl -s ipinfo.io/ip || echo "")
+    if [ "$PREFER_IP_VERSION" = "ipv4" ]; then
+        SERVER_PUBLIC_IP=$(curl -4 -s ifconfig.me || curl -4 -s ipinfo.io/ip || echo "")
+    elif [ "$PREFER_IP_VERSION" = "ipv6" ]; then
+        SERVER_PUBLIC_IP=$(curl -6 -s ifconfig.me || curl -6 -s ipinfo.io/ip || echo "")
+    else
+        SERVER_PUBLIC_IP=$(curl -s ifconfig.me || curl -s ipinfo.io/ip || echo "")
+    fi
     if [ -z "$SERVER_PUBLIC_IP" ]; then
         echo -e "${RED}Не удалось определить публичный IP. Укажите его в .env вручную.${NC}"
         exit 1
@@ -62,6 +68,9 @@ echo -e "${YELLOW}Копирование файлов бота в $INSTALL_DIR..
 mkdir -p "$INSTALL_DIR"
 cp -r "$SCRIPT_DIR/bot/"* "$INSTALL_DIR/"
 cp "$SCRIPT_DIR/.env" "$INSTALL_DIR/.env"
+# Актуализируем IP и протокол в скопированном .env
+sed -i "s|^SERVER_PUBLIC_IP=.*|SERVER_PUBLIC_IP=$SERVER_PUBLIC_IP|" "$INSTALL_DIR/.env"
+sed -i "s|^PREFER_IP_VERSION=.*|PREFER_IP_VERSION=${PREFER_IP_VERSION:-ipv4}|" "$INSTALL_DIR/.env"
 
 # 7. Установка Python-зависимостей
 echo -e "${YELLOW}Установка Python-зависимостей...${NC}"
