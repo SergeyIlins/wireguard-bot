@@ -2,6 +2,7 @@
 Address = 10.0.0.1/24
 ListenPort = {{ WG_PORT }}
 PrivateKey = {{ SERVER_PRIVATE_KEY }}
+MTU = 1400
 
 PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o {{ NETWORK_INTERFACE }} -j MASQUERADE
 PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -s 10.0.0.0/24 -o {{ NETWORK_INTERFACE }} -j MASQUERADE
