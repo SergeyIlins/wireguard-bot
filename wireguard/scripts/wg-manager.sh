@@ -1,6 +1,7 @@
 #!/bin/bash
 # WireGuard Manager Script
 # Поддерживает добавление/удаление клиентов, временные конфигурации, QR-коды и метаданные.
+# Исправлено: подсеть клиентов 10.0.0.0/24, принудительный IPv4 для Endpoint, MTU=1400.
 
 set -e
 
@@ -14,12 +15,17 @@ QRENCODE_BIN=$(which qrencode)
 
 # Параметры по умолчанию
 DEFAULT_WG_PORT="${WG_PORT:-51820}"
-DEFAULT_VPN_SUBNET_PREFIX="${VPN_SUBNET:-10.8.0.}"
+# !!! ИСПРАВЛЕНО: подсеть должна совпадать с серверной (wg0.conf Interface Address = 10.0.0.1/24) !!!
+DEFAULT_VPN_SUBNET_PREFIX="${VPN_SUBNET:-10.0.0.}"
 DEFAULT_SERVER_IP="${DEFAULT_VPN_SUBNET_PREFIX}1"
 
 # Публичный IP сервера (если не задан, попытаемся определить)
+# !!! ИСПРАВЛЕНО: принудительно запрашиваем IPv4 адрес, чтобы Endpoint был корректным !!!
 if [ -z "$SERVER_PUBLIC_IP" ] || [ "$SERVER_PUBLIC_IP" = "auto" ]; then
-    SERVER_PUBLIC_IP=$(curl -s ifconfig.me || curl -s ipinfo.io/ip || echo "127.0.0.1")
+    SERVER_PUBLIC_IP=$(curl -4 -s ifconfig.me || curl -4 -s ipinfo.io/ip || echo "127.0.0.1")
+    if [ "$SERVER_PUBLIC_IP" = "127.0.0.1" ]; then
+        echo "ПРЕДУПРЕЖДЕНИЕ: не удалось определить публичный IPv4 адрес. Используется 127.0.0.1."
+    fi
 fi
 
 # Создаём директорию для клиентских конфигов
@@ -93,7 +99,7 @@ add_client() {
     # Читаем публичный ключ сервера
     local server_pubkey=$(cat "$SERVER_PUBLIC_KEY_FILE")
 
-        # Определяем Endpoint с учётом типа IP (IPv6 требует скобок)
+    # Определяем Endpoint с учётом типа IP (IPv6 требует скобок)
     if [[ "$SERVER_PUBLIC_IP" =~ .*:.* ]]; then
         ENDPOINT="[$SERVER_PUBLIC_IP]:$DEFAULT_WG_PORT"
     else
@@ -112,7 +118,8 @@ MTU = 1400
 [Peer]
 PublicKey = $server_pubkey
 Endpoint = $ENDPOINT
-AllowedIPs = 0.0.0.0/0, ::/0
+# !!! ИСПРАВЛЕНО: убрана поддержка IPv6 (::/0), чтобы избежать утечек !!!
+AllowedIPs = 0.0.0.0/0
 PersistentKeepalive = 25
 EOF
 
@@ -134,7 +141,7 @@ AllowedIPs = $client_ip/32
 # END_PEER $name
 EOF
 
-    # Применяем изменения
+    # Применяем изменения в работающем интерфейсе
     wg addconf wg0 <(echo "[Peer]" && echo "PublicKey = $pubkey" && echo "AllowedIPs = $client_ip/32") 2>/dev/null || wg syncconf wg0 <(wg-quick strip wg0)
 
     # Обновляем метаданные
