@@ -107,6 +107,7 @@ add_client() {
 PrivateKey = $privkey
 Address = $client_ip/32
 DNS = 1.1.1.1, 8.8.8.8
+MTU = 1400
 
 [Peer]
 PublicKey = $server_pubkey
