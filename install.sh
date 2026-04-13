@@ -100,12 +100,11 @@ echo -e "${YELLOW}Включение IP-форвардинга...${NC}"
 if [ ! -f /etc/sysctl.conf ]; then
     touch /etc/sysctl.conf
 fi
-if ! grep -q "net.ipv4.ip_forward=1" /etc/sysctl.conf; then
-    echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
-fi
-if ! grep -q "net.ipv6.conf.all.forwarding=1" /etc/sysctl.conf; then
-    echo "net.ipv6.conf.all.forwarding=1" >> /etc/sysctl.conf
-fi
+sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' /etc/sysctl.conf
+sed -i 's/#net.ipv6.conf.all.forwarding=1/net.ipv6.conf.all.forwarding=1/' /etc/sysctl.conf
+# Если строк не было вообще — добавим
+grep -q "net.ipv4.ip_forward" /etc/sysctl.conf || echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+grep -q "net.ipv6.conf.all.forwarding" /etc/sysctl.conf || echo "net.ipv6.conf.all.forwarding=1" >> /etc/sysctl.conf
 sysctl -p
 
 # 11. Настройка UFW
