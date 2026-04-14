@@ -14,17 +14,12 @@ QRENCODE_BIN=$(which qrencode)
 
 # Параметры по умолчанию
 DEFAULT_WG_PORT="${WG_PORT:-51820}"
-# !!! ИСПРАВЛЕНО: подсеть должна совпадать с серверной (wg0.conf Interface Address = 10.0.0.1/24) !!!
-DEFAULT_VPN_SUBNET_PREFIX="${VPN_SUBNET:-10.0.0.}"
+DEFAULT_VPN_SUBNET_PREFIX="${VPN_SUBNET:-10.8.0.}"
 DEFAULT_SERVER_IP="${DEFAULT_VPN_SUBNET_PREFIX}1"
 
 # Публичный IP сервера (если не задан, попытаемся определить)
-# !!! ИСПРАВЛЕНО: принудительно запрашиваем IPv4 адрес, чтобы Endpoint был корректным !!!
 if [ -z "$SERVER_PUBLIC_IP" ] || [ "$SERVER_PUBLIC_IP" = "auto" ]; then
-    SERVER_PUBLIC_IP=$(curl -4 -s ifconfig.me || curl -4 -s ipinfo.io/ip || echo "127.0.0.1")
-    if [ "$SERVER_PUBLIC_IP" = "127.0.0.1" ]; then
-        echo "ПРЕДУПРЕЖДЕНИЕ: не удалось определить публичный IPv4 адрес. Используется 127.0.0.1."
-    fi
+    SERVER_PUBLIC_IP=$(curl -s ifconfig.me || curl -s ipinfo.io/ip || echo "127.0.0.1")
 fi
 
 # Создаём директорию для клиентских конфигов
@@ -89,7 +84,7 @@ add_client() {
         exit 1
     fi
 
-   # Генерация ключей и IP
+    # Генерация ключей и IP
     local keys=$(generate_keys)
     local privkey=$(echo "$keys" | cut -d' ' -f1)
     local pubkey=$(echo "$keys" | cut -d' ' -f2)
@@ -98,7 +93,7 @@ add_client() {
     # Читаем публичный ключ сервера
     local server_pubkey=$(cat "$SERVER_PUBLIC_KEY_FILE")
 
-    # Определяем Endpoint с учётом типа IP (IPv6 требует скобок)
+        # Определяем Endpoint с учётом типа IP (IPv6 требует скобок)
     if [[ "$SERVER_PUBLIC_IP" =~ .*:.* ]]; then
         ENDPOINT="[$SERVER_PUBLIC_IP]:$DEFAULT_WG_PORT"
     else
@@ -112,16 +107,14 @@ add_client() {
 PrivateKey = $privkey
 Address = $client_ip/32
 DNS = 1.1.1.1, 8.8.8.8
-MTU = 1400
+MTU = 1280
 
 [Peer]
 PublicKey = $server_pubkey
 Endpoint = $ENDPOINT
-# !!! ИСПРАВЛЕНО: убрана поддержка IPv6 (::/0), чтобы избежать утечек !!!
-AllowedIPs = 0.0.0.0/0
+AllowedIPs = 0.0.0.0/0, ::/0
 PersistentKeepalive = 25
 EOF
-
 
     # Генерируем QR-код в PNG
     local png_path="$CLIENTS_DIR/${name}.png"
@@ -231,18 +224,3 @@ case "$1" in
         exit 1
         ;;
 esac
-
-
-и код  файла wireguard/wg0.conf.template
-
-
-[Interface]
-Address = 10.0.0.1/24
-ListenPort = {{ WG_PORT }}
-PrivateKey = {{ SERVER_PRIVATE_KEY }}
-MTU = 1400
-
-PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o {{ NETWORK_INTERFACE }} -j MASQUERADE
-PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -s 10.0.0.0/24 -o {{ NETWORK_INTERFACE }} -j MASQUERADE
-
-# Клиенты будут добавляться скриптом wg-manager.sh
