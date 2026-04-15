@@ -1,3 +1,5 @@
+# Важное примечание: Установка на сервер только за пределами страны блокировки.
+
 # 1. Клонируем репозиторий
 git clone git clone https://github.com/SergeyIlins/wireguard-bot.git
 cd wireguard-bot
