@@ -110,11 +110,21 @@ grep -q "net.ipv4.ip_forward" /etc/sysctl.conf || echo "net.ipv4.ip_forward=1" >
 grep -q "net.ipv6.conf.all.forwarding" /etc/sysctl.conf || echo "net.ipv6.conf.all.forwarding=1" >> /etc/sysctl.conf
 sysctl -p
 
-# 11. Настройка UFW
+# 11. Настройка UFW (если установлен и активен)
 echo -e "${YELLOW}Настройка фаервола...${NC}"
-ufw allow ${WG_PORT:-51820}/udp comment 'WireGuard'
-ufw allow OpenSSH
-ufw --force enable
+if command -v ufw >/dev/null 2>&1; then
+    # Пытаемся добавить правило, игнорируя ошибку если уже есть
+    ufw allow ${WG_PORT:-51820}/udp comment 'WireGuard' 2>/dev/null || true
+    ufw allow OpenSSH 2>/dev/null || true
+    # Включаем только если не активен, иначе перезагружаем
+    if ufw status | grep -q "Status: inactive"; then
+        ufw --force enable || echo -e "${YELLOW}⚠️ Не удалось включить UFW, продолжаем...${NC}"
+    else
+        ufw reload || echo -e "${YELLOW}⚠️ Не удалось перезагрузить UFW, продолжаем...${NC}"
+    fi
+else
+    echo -e "${YELLOW}⚠️ UFW не установлен, пропускаем настройку фаервола${NC}"
+fi
 
 # 12. Запуск WireGuard
 echo -e "${YELLOW}Запуск WireGuard...${NC}"
