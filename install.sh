@@ -33,7 +33,7 @@ if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
     exit 1
 fi
 
-# 3. Публичный IP (с учётом PREFER_IP_VERSION)
+# 3. Публичный IP
 if [ -z "$SERVER_PUBLIC_IP" ] || [ "$SERVER_PUBLIC_IP" = "auto" ]; then
     echo -e "${YELLOW}Определяю публичный IP-адрес...${NC}"
     if [ "$PREFER_IP_VERSION" = "ipv4" ]; then
@@ -68,15 +68,19 @@ echo -e "${YELLOW}Копирование файлов бота в $INSTALL_DIR..
 mkdir -p "$INSTALL_DIR"
 cp -r "$SCRIPT_DIR/bot/"* "$INSTALL_DIR/"
 cp "$SCRIPT_DIR/.env" "$INSTALL_DIR/.env"
+
 # Актуализируем IP и протокол в скопированном .env
 sed -i "s|^SERVER_PUBLIC_IP=.*|SERVER_PUBLIC_IP=$SERVER_PUBLIC_IP|" "$INSTALL_DIR/.env"
 sed -i "s|^PREFER_IP_VERSION=.*|PREFER_IP_VERSION=${PREFER_IP_VERSION:-ipv4}|" "$INSTALL_DIR/.env"
 
-# 7. Установка Python-зависимостей
+# 7. Установка Python-зависимостей с поддержкой Python 3.14
 echo -e "${YELLOW}Установка Python-зависимостей...${NC}"
 cd "$INSTALL_DIR"
 python3 -m venv venv
 source venv/bin/activate
+
+# Ключевой момент: флаг для совместимости с Python 3.14
+export PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
 pip install --upgrade pip
 pip install -r requirements.txt
 deactivate
@@ -110,13 +114,11 @@ grep -q "net.ipv4.ip_forward" /etc/sysctl.conf || echo "net.ipv4.ip_forward=1" >
 grep -q "net.ipv6.conf.all.forwarding" /etc/sysctl.conf || echo "net.ipv6.conf.all.forwarding=1" >> /etc/sysctl.conf
 sysctl -p
 
-# 11. Настройка UFW (если установлен и активен)
+# 11. Настройка UFW
 echo -e "${YELLOW}Настройка фаервола...${NC}"
 if command -v ufw >/dev/null 2>&1; then
-    # Пытаемся добавить правило, игнорируя ошибку если уже есть
     ufw allow ${WG_PORT:-51820}/udp comment 'WireGuard' 2>/dev/null || true
     ufw allow OpenSSH 2>/dev/null || true
-    # Включаем только если не активен, иначе перезагружаем
     if ufw status | grep -q "Status: inactive"; then
         ufw --force enable || echo -e "${YELLOW}⚠️ Не удалось включить UFW, продолжаем...${NC}"
     else
