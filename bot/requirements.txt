@@ -2,7 +2,7 @@ fastapi==0.115.6
 uvicorn[standard]==0.34.0
 python-telegram-bot==21.7
 httpx==0.28.1
-pydantic==2.10.4
+pydantic==2.11.0
 qrcode[pil]==7.4.2
 Pillow
 python-dotenv==1.0.0
