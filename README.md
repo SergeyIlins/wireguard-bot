@@ -11,6 +11,8 @@
 
 ## 🚀 Быстрый запуск
 
+```bash
+
 # 0. Подготовка Сервера
 apt-get install sudo -y
 Обновление системы
@@ -18,7 +20,6 @@ sudo apt update && sudo apt upgrade -y
 Установка базовых утилит
 sudo apt install -y git nano curl wget
 
-```bash
 # 1. Клонируем репозиторий
 git clone https://github.com/SergeyIlins/wireguard-bot.git
 cd wireguard-bot
